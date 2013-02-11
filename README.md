@@ -10,9 +10,9 @@ The motivation for the plugin is to allow Typescript compilation, minification, 
 during a maven build. This is useful for compiling on cloud services such as Heroku where there is not always a
 native Typescript compiler available. To compile typescript during a build you could configure your pom.xml as follows.
 
-<pre>
-	<project>
-		<build>
+##### pom.xml file:
+    <project>
+    	<build>
 			<plugins>
 				<plugin>
 					<groupId>au.com.clearboxsystems.maven.plugins.nodejs</groupId>
@@ -41,9 +41,8 @@ native Typescript compiler available. To compile typescript during a build you c
 	                </configuration>
 	            </plugin>
 	        </plugins>
-	    </build>
-	</project>
-</pre>
+        </build>
+    </project>
 
 In this example, you would need to set up a directory called websrc/ts which contains a copy of the typescript compiler
 calles tsc-0.8.2.js along with its lid.d.ts file.
