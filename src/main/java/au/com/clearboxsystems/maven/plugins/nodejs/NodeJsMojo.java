@@ -64,7 +64,7 @@ public class NodeJsMojo extends AbstractMojo {
 			} else if (Os.isFamily(Os.FAMILY_UNIX)) {
 				if (Os.isArch("x86")) {
 					nodeJsURL = baseURL + "node-v" + nodeJsVersion + "-linux-x86.tar.gz";
-				} else if (Os.isArch("x64")) {
+				} else if (Os.isArch("x86_64") || Os.isArch("amd_64")) {
 					nodeJsURL = baseURL + "node-v" + nodeJsVersion + "-linux-x64.tar.gz";
 				} else {
 					getLog().error("Unsupported OS Arch " + Os.OS_ARCH);
@@ -92,7 +92,7 @@ public class NodeJsMojo extends AbstractMojo {
 		} else if (Os.isFamily(Os.FAMILY_UNIX)) {
 			if (Os.isArch("x86")) {
 				return basePath + "node-v" + nodeJsVersion + "-linux-x86.tar.gz";
-			} else if (Os.isArch("x64")) {
+			} else if (Os.isArch("x86_64") || Os.isArch("amd_64")) {
 				return basePath + "node-v" + nodeJsVersion + "-linux-x64.tar.gz";
 			} else {
 				getLog().error("Unsupported OS Arch " + Os.OS_ARCH);
@@ -110,7 +110,7 @@ public class NodeJsMojo extends AbstractMojo {
 		if (Os.isFamily(Os.FAMILY_WINDOWS) || Os.isFamily(Os.FAMILY_WIN9X)) {
 			return basePath + "node-" + nodeJsVersion + ".exe";
 		} else if (Os.isFamily(Os.FAMILY_UNIX)) {
-			return basePath + "node-v" + nodeJsVersion + "-linux-" + Os.OS_ARCH + File.separator + "bin" + File.separator + "node";
+			return basePath + "node-v" + nodeJsVersion + "-linux-x" + (Os.OS_ARCH.equals("x86") ? "86" : "64") + File.separator + "bin" + File.separator + "node";
 		} else {
 			getLog().error("Unsupported OS Family " + Os.OS_FAMILY);
 			throw new MojoExecutionException("Unsupported OS Family " + Os.OS_FAMILY);
@@ -129,7 +129,7 @@ public class NodeJsMojo extends AbstractMojo {
 				getLog().info("Downloading Node JS from " + getNodeJsURL());
 				FileUtils.copyURLToFile(getNodeJsURL(), new File(getNodeJsFilePath()));
 				if (Os.isFamily(Os.FAMILY_UNIX)) { // Unpack tar
-					String tarName = "node-v" + nodeJsVersion + "-linux-x" + Os.OS_ARCH + ".tar.gz";
+					String tarName = "node-v" + nodeJsVersion + "-linux-x" + (Os.OS_ARCH.equals("x86") ? "86" : "64") + ".tar.gz";
 
 					Commandline commandLine = getCommandLine(nodejsDirectory, "tar", "xf", tarName);
 					executeCommandLine(commandLine);
