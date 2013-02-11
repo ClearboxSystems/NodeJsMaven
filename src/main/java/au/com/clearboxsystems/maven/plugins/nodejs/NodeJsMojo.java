@@ -36,10 +36,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 
-/**
- * Goal which touches a timestamp file.
- *
- */
 @Mojo( name = "compile", defaultPhase = LifecyclePhase.PROCESS_SOURCES)
 public class NodeJsMojo extends AbstractMojo {
 
