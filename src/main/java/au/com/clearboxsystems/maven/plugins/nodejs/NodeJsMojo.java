@@ -16,16 +16,12 @@ package au.com.clearboxsystems.maven.plugins.nodejs;
  * limitations under the License.
  */
 
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.resolver.ArtifactNotFoundException;
-import org.apache.maven.artifact.resolver.ArtifactResolutionException;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.Os;
 import org.codehaus.plexus.util.StringUtils;
@@ -35,11 +31,8 @@ import org.codehaus.plexus.util.cli.CommandLineUtils;
 import org.codehaus.plexus.util.cli.Commandline;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.List;
 
@@ -50,11 +43,14 @@ import java.util.List;
 @Mojo( name = "compile", defaultPhase = LifecyclePhase.PROCESS_SOURCES)
 public class NodeJsMojo extends AbstractMojo {
 
+	@Parameter
+	protected String nodeJsURL;
+
 	@Parameter(defaultValue = "0.8.19")
 	protected String nodeJsVersion;
 
 	@Parameter
-	protected List<NodeJsModule> modules;
+	protected List<NodeJsTask> nodeJsTasks;
 
 	/**
 	 * Default location where nodejs will be extracted to and run from
@@ -62,36 +58,92 @@ public class NodeJsMojo extends AbstractMojo {
 	@Parameter(defaultValue = "${java.io.tmpdir}/nodejs")
 	protected File nodejsDirectory;
 
-	public void execute() throws MojoExecutionException {
-		if (modules == null || modules.isEmpty()) {
-			getLog().warn("No NodeJS work modules have been defined. Nothing to do");
-			return;
-		}
+	private URL getNodeJsURL() throws MojoExecutionException {
+		if (nodeJsURL == null || nodeJsURL.length() == 0) {
 
-		String nodeJsClassifier = Os.OS_FAMILY;
-		String nodeJsExecutable = getNodeJsExecutable(nodeJsClassifier);
+			String baseURL = "http://nodejs.org/dist/v" + nodeJsVersion + "/";
 
-		String nodeJsUrl = "http://nodejs.org/dist/v" + nodeJsVersion + "/";
-
-		if (nodeJsClassifier.toLowerCase().startsWith("win") || Os.FAMILY_DOS.equals(nodeJsClassifier)) {
-			nodeJsUrl = nodeJsUrl + "node.exe";
-		} else {
-			nodeJsUrl = nodeJsUrl + "node-v" + nodeJsVersion + "-linux-x86.tar.gz";
+			if (Os.isFamily(Os.FAMILY_WINDOWS) || Os.isFamily(Os.FAMILY_WIN9X)) {
+				nodeJsURL = baseURL + "node.exe";
+			} else if (Os.isFamily(Os.FAMILY_UNIX)) {
+				if (Os.isArch("x86")) {
+					nodeJsURL = baseURL + "node-v" + nodeJsVersion + "-linux-x86.tar.gz";
+				} else if (Os.isArch("x64")) {
+					nodeJsURL = baseURL + "node-v" + nodeJsVersion + "-linux-x64.tar.gz";
+				} else {
+					getLog().error("Unsupported OS Arch " + Os.OS_ARCH);
+					throw new MojoExecutionException("Unsupported OS Arch " + Os.OS_ARCH);
+				}
+			} else {
+				getLog().error("Unsupported OS Family " + Os.OS_FAMILY);
+				throw new MojoExecutionException("Unsupported OS Family " + Os.OS_FAMILY);
+			}
 		}
 
 		try {
+			return new URL(nodeJsURL);
+		} catch (MalformedURLException ex) {
+			getLog().error("Malformed URL: " + nodeJsURL, ex);
+			throw new MojoExecutionException("Malformed URL: " + nodeJsURL, ex);
+		}
+	}
+
+	private String getNodeJsFilePath() throws MojoExecutionException {
+		String basePath = nodejsDirectory.getAbsolutePath() + File.separator;
+
+		if (Os.isFamily(Os.FAMILY_WINDOWS) || Os.isFamily(Os.FAMILY_WIN9X)) {
+			return basePath + "node-" + nodeJsVersion + ".exe";
+		} else if (Os.isFamily(Os.FAMILY_UNIX)) {
+			if (Os.isArch("x86")) {
+				return basePath + "node-v" + nodeJsVersion + "-linux-x86.tar.gz";
+			} else if (Os.isArch("x64")) {
+				return basePath + "node-v" + nodeJsVersion + "-linux-x64.tar.gz";
+			} else {
+				getLog().error("Unsupported OS Arch " + Os.OS_ARCH);
+				throw new MojoExecutionException("Unsupported OS Arch " + Os.OS_ARCH);
+			}
+		} else {
+			getLog().error("Unsupported OS Family " + Os.OS_FAMILY);
+			throw new MojoExecutionException("Unsupported OS Family " + Os.OS_FAMILY);
+		}
+	}
+
+	private String getNodeJsExecutable() throws MojoExecutionException {
+		String basePath = nodejsDirectory.getAbsolutePath() + File.separator;
+
+		if (Os.isFamily(Os.FAMILY_WINDOWS) || Os.isFamily(Os.FAMILY_WIN9X)) {
+			return basePath + "node-" + nodeJsVersion + ".exe";
+		} else if (Os.isFamily(Os.FAMILY_UNIX)) {
+			return basePath + "node-v" + nodeJsVersion + "-linux-" + Os.OS_ARCH + File.separator + "bin" + File.separator + "node";
+		} else {
+			getLog().error("Unsupported OS Family " + Os.OS_FAMILY);
+			throw new MojoExecutionException("Unsupported OS Family " + Os.OS_FAMILY);
+		}
+	}
+
+	public void execute() throws MojoExecutionException {
+		if (nodeJsTasks == null || nodeJsTasks.isEmpty()) {
+			getLog().warn("No NodeJSTasks have been defined. Nothing to do");
+			return;
+		}
+
+		try {
+			String nodeJsExecutable = getNodeJsExecutable();
 			if (!FileUtils.fileExists(nodeJsExecutable)) {
-				getLog().info("Downloading nodeJs");
-				FileUtils.copyURLToFile(new URL(nodeJsUrl), new File(nodeJsExecutable));
+				getLog().info("Downloading Node JS from " + getNodeJsURL());
+				FileUtils.copyURLToFile(getNodeJsURL(), new File(getNodeJsFilePath()));
+				if (Os.isFamily(Os.FAMILY_UNIX)) { // Unpack tar
+					String tarName = "node-v" + nodeJsVersion + "-linux-x" + Os.OS_ARCH + ".tar.gz";
+
+					Commandline commandLine = getCommandLine(nodejsDirectory, "tar", "xf", tarName);
+					executeCommandLine(commandLine);
+				}
 			}
 
 			executeNodeJs(nodeJsExecutable);
-		} catch(MalformedURLException ex) {
-			getLog().error("Did not like URL format: " + nodeJsUrl, ex);
-			throw new MojoExecutionException("Did not like URL format: " + nodeJsUrl, ex);
 		} catch (IOException ex) {
-			getLog().error("Failed to downloading nodeJs from " + nodeJsUrl, ex);
-			throw new MojoExecutionException("Failed to downloading nodeJs from " + nodeJsUrl, ex);
+			getLog().error("Failed to downloading nodeJs from " + nodeJsURL, ex);
+			throw new MojoExecutionException("Failed to downloading nodeJs from " + nodeJsURL, ex);
 		} catch (MojoExecutionException ex) {
 			getLog().error("Execution Exception", ex);
 			throw new MojoExecutionException("Execution Exception", ex);
@@ -100,28 +152,6 @@ public class NodeJsMojo extends AbstractMojo {
 			throw new MojoExecutionException("Command execution failed.", ex);
 		}
     }
-
-	/**
-	 * Determine the right command executable for the given osFamily
-	 *
-	 * @param osFamily
-	 * @return
-	 */
-	protected String getNodeJsExecutable(String osFamily) {
-		if (osFamily == null) {
-			throw new IllegalArgumentException("osFamily is null");
-		}
-		getLog().debug(String.format("Determing executable for osFamily = '%s'", osFamily));
-		StringBuilder sb = new StringBuilder(nodejsDirectory.getAbsolutePath());
-		if (osFamily.toLowerCase().startsWith("win") || Os.FAMILY_DOS.equals(osFamily)) {
-			sb.append(File.separator).append("node-" + nodeJsVersion + ".exe");
-		} else {
-			sb.append(File.separator).append("bin").append(File.separator).append("node");
-		}
-		getLog().info(String.format("Determined executable for osFamily '%s' = '%s'", osFamily, sb.toString()));
-		return sb.toString();
-	}
-
 
 	/**
 	 * Executes the given commandline
@@ -186,17 +216,9 @@ public class NodeJsMojo extends AbstractMojo {
 		return commandLine;
 	}
 
-	/**
-	 * Execute nodejs for every module in #modules.
-	 *
-	 * @param executable
-	 * @throws MojoExecutionException
-	 * @throws CommandLineException
-	 */
 	protected void executeNodeJs(String executable) throws MojoExecutionException, CommandLineException {
-		for (NodeJsModule module : modules) {
-			// get a commandline with the nodejs executable
-			Commandline commandLine = getCommandLine(module.workingDirectory, executable, module.name, module.arguments);
+		for (NodeJsTask task : nodeJsTasks) {
+			Commandline commandLine = getCommandLine(task.workingDirectory, executable, task.name, task.arguments);
 			executeCommandLine(commandLine);
 		}
 	}

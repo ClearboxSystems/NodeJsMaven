@@ -23,7 +23,7 @@ import java.io.File;
  * Author: Paul Solomon
  * Date: 11/02/13
  */
-public class NodeJsModule {
+public class NodeJsTask {
 	@Parameter
 	public File workingDirectory;
 
