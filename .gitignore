@@ -1,0 +1,29 @@
+#Java Specific
+*.class
+*.jar
+*.war
+*.ear
+
+#Idea Specific
+.idea/
+*.iml
+out/
+
+#Visual Studio Specific
+*.csproj
+*.csproj.user
+*.sln
+*.suo
+bin/
+obj/
+
+#General
+logs/
+*~
+*.lock
+*.DS_Store
+*.swp
+*.out
+
+#Maven
+target/
