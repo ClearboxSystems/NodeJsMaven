@@ -64,7 +64,7 @@ public class NodeJsMojo extends AbstractMojo {
 			} else if (Os.isFamily(Os.FAMILY_UNIX)) {
 				if (Os.isArch("x86")) {
 					nodeJsURL = baseURL + "node-v" + nodeJsVersion + "-linux-x86.tar.gz";
-				} else if (Os.isArch("x86_64") || Os.isArch("amd_64")) {
+				} else if (Os.isArch("x86_64") || Os.isArch("amd64")) {
 					nodeJsURL = baseURL + "node-v" + nodeJsVersion + "-linux-x64.tar.gz";
 				} else {
 					getLog().error("Unsupported OS Arch " + Os.OS_ARCH);
@@ -92,7 +92,7 @@ public class NodeJsMojo extends AbstractMojo {
 		} else if (Os.isFamily(Os.FAMILY_UNIX)) {
 			if (Os.isArch("x86")) {
 				return basePath + "node-v" + nodeJsVersion + "-linux-x86.tar.gz";
-			} else if (Os.isArch("x86_64") || Os.isArch("amd_64")) {
+			} else if (Os.isArch("x86_64") || Os.isArch("amd64")) {
 				return basePath + "node-v" + nodeJsVersion + "-linux-x64.tar.gz";
 			} else {
 				getLog().error("Unsupported OS Arch " + Os.OS_ARCH);
