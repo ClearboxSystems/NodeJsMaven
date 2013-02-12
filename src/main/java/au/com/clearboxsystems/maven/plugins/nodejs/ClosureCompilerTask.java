@@ -18,18 +18,26 @@ package au.com.clearboxsystems.maven.plugins.nodejs;
 import org.apache.maven.plugins.annotations.Parameter;
 
 import java.io.File;
+import java.util.List;
 
 /**
  * Author: Paul Solomon
  * Date: 11/02/13
  */
-public class NodeJsTask extends Task {
-	@Parameter
-	public File workingDirectory;
+public class ClosureCompilerTask extends Task {
+	@Parameter(required = true)
+	public File sourceFile;
 
 	@Parameter
-	public String name;
+	public List<File> externs;
 
-	@Parameter
-	public String[] arguments;
+	@Parameter(required = true)
+	public File outputFile;
+
+//	WHITESPACE_ONLY,
+//	SIMPLE_OPTIMIZATIONS
+//	ADVANCED_OPTIMIZATIONS
+	@Parameter(defaultValue = "SIMPLE_OPTIMIZATIONS")
+	public String compilationLevel;
+
 }
