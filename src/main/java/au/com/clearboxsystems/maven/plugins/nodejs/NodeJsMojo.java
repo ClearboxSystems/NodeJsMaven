@@ -35,8 +35,9 @@ import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.*;
 
 @Mojo( name = "compile", defaultPhase = LifecyclePhase.PROCESS_SOURCES)
 public class NodeJsMojo extends AbstractMojo {
@@ -55,6 +56,8 @@ public class NodeJsMojo extends AbstractMojo {
 	 */
 	@Parameter(defaultValue = "${java.io.tmpdir}/nodejs")
 	protected File nodejsDirectory;
+
+	private String nodeJsExecutable;
 
 	private URL getNodeJsURL() throws MojoExecutionException {
 		if (nodeJsURL == null || nodeJsURL.length() == 0) {
@@ -125,8 +128,8 @@ public class NodeJsMojo extends AbstractMojo {
 			return;
 		}
 
+		nodeJsExecutable = getNodeJsExecutable();
 		try {
-			String nodeJsExecutable = getNodeJsExecutable();
 			if (!FileUtils.fileExists(nodeJsExecutable)) {
 				getLog().info("Downloading Node JS from " + getNodeJsURL());
 				FileUtils.copyURLToFile(getNodeJsURL(), new File(getNodeJsFilePath()));
@@ -139,14 +142,7 @@ public class NodeJsMojo extends AbstractMojo {
 			}
 
 			for (Task task : tasks) {
-				if (task instanceof NodeJsTask) {
-					NodeJsTask nodeJsTask = (NodeJsTask) task;
-					Commandline commandLine = getCommandLine(nodeJsTask.workingDirectory, nodeJsExecutable, nodeJsTask.name, nodeJsTask.arguments);
-					executeCommandLine(commandLine);
-				} else if (task instanceof ClosureCompilerTask) {
-					ClosureCompilerTask closureCompilerTask = (ClosureCompilerTask) task;
-					executeClosureCompiler(closureCompilerTask);
-				}
+				executeTask(task);
 			}
 		} catch (IOException ex) {
 			getLog().error("Failed to downloading nodeJs from " + nodeJsURL, ex);
@@ -162,38 +158,61 @@ public class NodeJsMojo extends AbstractMojo {
 
 	protected void executeClosureCompiler(ClosureCompilerTask task) {
 		getLog().info("Closure Compiler compiling: " + task.sourceFile.getName() + " with " + task.compilationLevel);
-		ClosureCompilerRunner closureCompiler = buildClosureCompilerRunner(task.compilationLevel, task.sourceFile, task.externs, task.outputFile);
+		ClosureCompilerRunner closureCompiler = buildClosureCompilerRunner(task);
 		if (closureCompiler.shouldRunCompiler()) {
-			closureCompiler.run();
+			closureCompiler.myRun();
 		}
 	}
 
-
-	public ClosureCompilerRunner buildClosureCompilerRunner(String compilationLevel, File sourcePath, List<File> externPaths, File outputPath) {
+	public ClosureCompilerRunner buildClosureCompilerRunner(ClosureCompilerTask task) {
 		List<String> args = new ArrayList<>();
 
 		args.add("--compilation_level");
-		args.add(compilationLevel);
+		args.add(task.compilationLevel);
 
 		args.add("--js");
-		args.add(sourcePath.getAbsolutePath());
+		args.add(task.sourceFile.getAbsolutePath());
 
-		if (externPaths != null) {
-			for (File externPath : externPaths) {
+		addExternDirectory(task.externDirectory, args);
+		if (task.externs != null) {
+			for (File externPath : task.externs) {
 				args.add("--externs");
 				args.add(externPath.getAbsolutePath());
 			}
 		}
 
 		args.add("--js_output_file");
-		args.add(outputPath.getAbsolutePath());
+		args.add(task.outputFile.getAbsolutePath());
 
-		return new ClosureCompilerRunner(args.toArray(new String[args.size()]));
+		return new ClosureCompilerRunner(args.toArray(new String[args.size()]), task.outputFile);
+	}
+
+	private void addExternDirectory(File externDirectory, List<String> args) {
+		if (externDirectory != null) {
+			for (File extern : externDirectory.listFiles()) {
+				if (extern.isFile()) {
+					args.add("--externs");
+					args.add(extern.getAbsolutePath());
+				} else if (extern.isDirectory()) {
+					addExternDirectory(extern, args);
+				}
+			}
+		}
 	}
 
 	public class ClosureCompilerRunner extends CommandLineRunner {
-		public ClosureCompilerRunner(String[] args) {
+		private File outputFile;
+		public ClosureCompilerRunner(String[] args, File outputFile) {
 			super(args);
+			this.outputFile = outputFile;
+		}
+
+		public void myRun() {
+			try {
+				doRun();
+			} catch (Exception e) {
+			} catch (Throwable t) {
+			}
 		}
 	}
 
@@ -260,5 +279,15 @@ public class NodeJsMojo extends AbstractMojo {
 		return commandLine;
 	}
 
+	protected void executeTask(Task task) throws CommandLineException, MojoExecutionException {
+		if (task instanceof NodeJsTask) {
+			NodeJsTask nodeJsTask = (NodeJsTask) task;
+			Commandline commandLine = getCommandLine(nodeJsTask.workingDirectory, nodeJsExecutable, nodeJsTask.name, nodeJsTask.arguments);
+			executeCommandLine(commandLine);
+		} else if (task instanceof ClosureCompilerTask) {
+			ClosureCompilerTask closureCompilerTask = (ClosureCompilerTask) task;
+			executeClosureCompiler(closureCompilerTask);
+		}
+	}
 
 }

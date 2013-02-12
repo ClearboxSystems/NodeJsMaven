@@ -57,3 +57,12 @@ calles tsc-0.8.2.js along with its lid.d.ts file.
 
 As of version 1.1 closure compiler is supported as a task, so this can allow for GCC based minification to occur in your
 build instead of javascript based solutions such as uglifyjs up yui.
+
+As of version 1.2 added support for externsDirectory in the closure compiler so that you can add an entire directory of
+externs in a single command line
+
+Also added a watch goal so that any task that has <watch>true</watch> will keep watching files and recompiling files
+when the watched files are modified
+
+This can be executed with <pre> mvn nodejs:watch <pre>
+

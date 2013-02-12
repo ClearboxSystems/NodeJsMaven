@@ -27,3 +27,4 @@ logs/
 
 #Maven
 target/
+release.properties

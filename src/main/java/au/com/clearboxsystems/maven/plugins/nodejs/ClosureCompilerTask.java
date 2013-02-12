@@ -29,6 +29,9 @@ public class ClosureCompilerTask extends Task {
 	public File sourceFile;
 
 	@Parameter
+	public File externDirectory;
+
+	@Parameter
 	public List<File> externs;
 
 	@Parameter(required = true)
