@@ -17,7 +17,7 @@ native Typescript compiler available. To compile typescript during a build you c
 				<plugin>
 					<groupId>au.com.clearboxsystems.maven.plugins.nodejs</groupId>
 	                <artifactId>nodejs-maven-plugin</artifactId>
-	                <version>1.0-SNAPSHOT</version>
+	                <version>1.1</version>
 	                <executions>
 	                    <execution>
 	                        <phase>compile</phase>
@@ -27,7 +27,7 @@ native Typescript compiler available. To compile typescript during a build you c
 	                    </execution>
 	                </executions>
 	                <configuration>
-	                    <nodeJsTasks>
+	                    <tasks>
 	                        <nodeJsTask>
 	                            <workingDirectory>websrc/ts</workingDirectory>
 	                            <name>tsc-0.8.2.js</name>
@@ -37,7 +37,15 @@ native Typescript compiler available. To compile typescript during a build you c
 	                                <argument>sourceFile.ts</argument>
 	                            </arguments>
 	                        </nodeJsTask>
-	                    </nodeJsTasks>
+	                        <closureCompilerTask>
+								<compilationLevel>ADVANCED_OPTIMIZATIONS</compilationLevel>
+								<sourceFile>${basedir}/web/js/outputFile.js</sourceFile>
+								<externs>
+									<extern>${basedir}/websrc/externs/angular.js</extern>
+								</externs>
+								<outputFile>${basedir}/web/js/outputFile.min.js</outputFile>
+							</closureCompilerTask>
+	                    </tasks>
 	                </configuration>
 	            </plugin>
 	        </plugins>
@@ -47,3 +55,5 @@ native Typescript compiler available. To compile typescript during a build you c
 In this example, you would need to set up a directory called websrc/ts which contains a copy of the typescript compiler
 calles tsc-0.8.2.js along with its lid.d.ts file.
 
+As of version 1.1 closure compiler is supported as a task, so this can allow for GCC based minification to occur in your
+build instead of javascript based solutions such as uglifyjs up yui.
