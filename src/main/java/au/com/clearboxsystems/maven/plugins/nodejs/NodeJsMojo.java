@@ -51,6 +51,9 @@ public class NodeJsMojo extends AbstractMojo {
 	@Parameter
 	protected List<Task> tasks;
 
+	@Parameter
+	protected boolean stopOnError;
+
 	/**
 	 * Default location where nodejs will be extracted to and run from
 	 */
@@ -149,7 +152,8 @@ public class NodeJsMojo extends AbstractMojo {
 			throw new MojoExecutionException("Failed to downloading nodeJs from " + nodeJsURL, ex);
 		} catch (MojoExecutionException ex) {
 			getLog().error("Execution Exception", ex);
-//			throw new MojoExecutionException("Execution Exception", ex);
+			if (stopOnError)
+				throw new MojoExecutionException("Execution Exception", ex);
 		} catch (CommandLineException ex) {
 			getLog().error("Command Line Exception", ex);
 			throw new MojoExecutionException("Command execution failed.", ex);
