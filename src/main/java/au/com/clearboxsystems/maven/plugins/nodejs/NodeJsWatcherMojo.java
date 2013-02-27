@@ -64,6 +64,9 @@ public class NodeJsWatcherMojo extends NodeJsMojo {
 	}
 
 	protected void doExecute() throws IOException, InterruptedException, CommandLineException, MojoExecutionException {
+		if (tasks == null || tasks.isEmpty()) {
+			return;
+		}
 
 		for (Task task : tasks) {
 			if (task.watch) {
