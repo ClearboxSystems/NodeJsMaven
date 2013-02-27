@@ -69,7 +69,7 @@ public class NodeJsMojo extends AbstractMojo {
 
 			if (Os.isFamily(Os.FAMILY_WINDOWS) || Os.isFamily(Os.FAMILY_WIN9X)) {
 				nodeJsURL = baseURL + "node.exe";
-      } else if (Os.isFamily(Os.FAMILY_MAC)) {
+			} else if (Os.isFamily(Os.FAMILY_MAC)) {
 				if (Os.isArch("x86")) {
 					nodeJsURL = baseURL + "node-v" + nodeJsVersion + "-darwin-x86.tar.gz";
 				} else if (Os.isArch("x86_64") || Os.isArch("amd64")) {
