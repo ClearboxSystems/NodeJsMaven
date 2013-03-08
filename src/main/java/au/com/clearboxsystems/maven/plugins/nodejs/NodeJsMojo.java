@@ -259,15 +259,23 @@ public class NodeJsMojo extends AbstractMojo {
 		CommandLineUtils.StringStreamConsumer systemOut = new CommandLineUtils.StringStreamConsumer();
 
 		int exitCode = CommandLineUtils.executeCommandLine(commandLine, systemOut, systemErr);
-		String output = StringUtils.isEmpty(systemOut.getOutput()) ? null : '\n' + systemOut.getOutput().trim();
-		if (StringUtils.isNotEmpty(output)) {
-			getLog().info(output);
+		String output = systemOut.getOutput().trim();
+		if (!StringUtils.isEmpty(output)) {
+			getLog().info("");
+			for (String line : output.split("\n")) {
+				getLog().info(line);
+			}
+			getLog().info("");
+		}
+		output = systemErr.getOutput().trim();
+		if (!StringUtils.isEmpty(output)) {
+			getLog().error("");
+			for (String line : output.split("\n")) {
+				getLog().error(line);
+			}
+			getLog().error("");
 		}
 		if (exitCode != 0) {
-			output = StringUtils.isEmpty(systemErr.getOutput()) ? null : '\n' + systemErr.getOutput().trim();
-			if (StringUtils.isNotEmpty(output)) {
-				getLog().error(output);
-			}
 			throw new MojoExecutionException("Result of " + commandLine + " execution is: '" + exitCode + "'.");
 		}
 	}
