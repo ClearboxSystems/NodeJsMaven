@@ -39,8 +39,17 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 
-@Mojo( name = "compile", defaultPhase = LifecyclePhase.PROCESS_SOURCES)
-public class NodeJsMojo extends AbstractMojo {
+public abstract class NodeJsMojoBase extends AbstractMojo {
+
+	public static class NodeInstallInformation {
+		public URL url;
+		public File archive;
+		public File executable;
+	}
+
+	public static interface TaskFilter {
+		boolean accept(Task t);
+	}
 
 	@Parameter
 	protected String nodeJsURL;
@@ -58,119 +67,76 @@ public class NodeJsMojo extends AbstractMojo {
 	 * Default location where nodejs will be extracted to and run from
 	 */
 	@Parameter(defaultValue = "${java.io.tmpdir}/nodejs")
-	protected File nodejsDirectory;
+	protected File nodeJsDirectory;
 
-	private String nodeJsExecutable;
-
-	private URL getNodeJsURL() throws MojoExecutionException {
-		if (nodeJsURL == null || nodeJsURL.length() == 0) {
-
-			String baseURL = "http://nodejs.org/dist/v" + nodeJsVersion + "/";
-
-			if (Os.isFamily(Os.FAMILY_WINDOWS) || Os.isFamily(Os.FAMILY_WIN9X)) {
-				nodeJsURL = baseURL + "node.exe";
-			} else if (Os.isFamily(Os.FAMILY_MAC)) {
-				if (Os.isArch("x86")) {
-					nodeJsURL = baseURL + "node-v" + nodeJsVersion + "-darwin-x86.tar.gz";
-				} else if (Os.isArch("x86_64") || Os.isArch("amd64")) {
-					nodeJsURL = baseURL + "node-v" + nodeJsVersion + "-darwin-x64.tar.gz";
-				} else {
-					getLog().error("Unsupported OS Arch " + Os.OS_ARCH);
-					throw new MojoExecutionException("Unsupported OS Arch " + Os.OS_ARCH);
-				}
-			} else if (Os.isFamily(Os.FAMILY_UNIX)) {
-				if (Os.isArch("x86")) {
-					nodeJsURL = baseURL + "node-v" + nodeJsVersion + "-linux-x86.tar.gz";
-				} else if (Os.isArch("x86_64") || Os.isArch("amd64")) {
-					nodeJsURL = baseURL + "node-v" + nodeJsVersion + "-linux-x64.tar.gz";
-				} else {
-					getLog().error("Unsupported OS Arch " + Os.OS_ARCH);
-					throw new MojoExecutionException("Unsupported OS Arch " + Os.OS_ARCH);
-				}
-			} else {
-				getLog().error("Unsupported OS Family " + Os.OS_FAMILY);
-				throw new MojoExecutionException("Unsupported OS Family " + Os.OS_FAMILY);
-			}
+	protected static NodeInstallInformation getNodeInstallationInformation(String version, File directory) throws MojoExecutionException {
+		String baseURL = "http://nodejs.org/dist/v" + version + "/";
+		String basePath = directory.getAbsolutePath() + File.separator;
+		String arch;
+		if (Os.isArch("x86")) {
+			arch = "x86";
+		} else if (Os.isArch("x86_64") || Os.isArch("amd64")) {
+			arch = "x64";
+		} else {
+			throw new MojoExecutionException("Unsupported OS arch: " + Os.OS_ARCH);
 		}
 
+		NodeInstallInformation result = new NodeInstallInformation();
 		try {
-			return new URL(nodeJsURL);
-		} catch (MalformedURLException ex) {
-			getLog().error("Malformed URL: " + nodeJsURL, ex);
-			throw new MojoExecutionException("Malformed URL: " + nodeJsURL, ex);
-		}
-	}
-
-	private String getNodeJsFilePath() throws MojoExecutionException {
-		String basePath = nodejsDirectory.getAbsolutePath() + File.separator;
-
-		if (Os.isFamily(Os.FAMILY_WINDOWS) || Os.isFamily(Os.FAMILY_WIN9X)) {
-			return basePath + "node-" + nodeJsVersion + ".exe";
-		} else if (Os.isFamily(Os.FAMILY_MAC)) {
-			if (Os.isArch("x86")) {
-				return basePath + "node-v" + nodeJsVersion + "-darwin-x86.tar.gz";
-			} else if (Os.isArch("x86_64") || Os.isArch("amd64")) {
-				return basePath + "node-v" + nodeJsVersion + "-darwin-x64.tar.gz";
+			if (Os.isFamily(Os.FAMILY_WINDOWS) || Os.isFamily(Os.FAMILY_WIN9X)) {
+				result.url = new URL(baseURL + "node.exe");
+				result.archive = new File(basePath + "node-" + version + ".exe");
+				result.executable = new File(basePath + "node-" + version + ".exe");
+			} else if (Os.isFamily(Os.FAMILY_MAC)) {
+				result.url = new URL(baseURL + "node-v" + version + "-darwin-" + arch + ".tar.gz");
+				result.archive = new File(basePath + "node-v" + version + "-darwin-" + arch + ".tar.gz");
+				result.executable = new File(basePath + "node-v" + version + "-darwin-" + arch + File.separator + "bin" + File.separator + "node");
+			} else if (Os.isFamily(Os.FAMILY_UNIX)) {
+				result.url = new URL(baseURL + "node-v" + version + "-linux-" + arch + ".tar.gz");
+				result.archive = new File(basePath + "node-v" + version + "-linux-" + arch + ".tar.gz");
+				result.executable = new File(basePath + "node-v" + version + "-linux-" + arch + File.separator + "bin" + File.separator + "node");
 			} else {
-				getLog().error("Unsupported OS Arch " + Os.OS_ARCH);
-				throw new MojoExecutionException("Unsupported OS Arch " + Os.OS_ARCH);
+				throw new MojoExecutionException("Unsupported OS: " + Os.OS_FAMILY);
 			}
-		} else if (Os.isFamily(Os.FAMILY_UNIX)) {
-			if (Os.isArch("x86")) {
-				return basePath + "node-v" + nodeJsVersion + "-linux-x86.tar.gz";
-			} else if (Os.isArch("x86_64") || Os.isArch("amd64")) {
-				return basePath + "node-v" + nodeJsVersion + "-linux-x64.tar.gz";
-			} else {
-				getLog().error("Unsupported OS Arch " + Os.OS_ARCH);
-				throw new MojoExecutionException("Unsupported OS Arch " + Os.OS_ARCH);
-			}
-		} else {
-			getLog().error("Unsupported OS Family " + Os.OS_FAMILY);
-			throw new MojoExecutionException("Unsupported OS Family " + Os.OS_FAMILY);
+		} catch (java.net.MalformedURLException ex) {
+			throw new MojoExecutionException("Malformed node URL", ex);
 		}
+		return result;
 	}
 
-	private String getNodeJsExecutable() throws MojoExecutionException {
-		String basePath = nodejsDirectory.getAbsolutePath() + File.separator;
-
-		if (Os.isFamily(Os.FAMILY_WINDOWS) || Os.isFamily(Os.FAMILY_WIN9X)) {
-			return basePath + "node-" + nodeJsVersion + ".exe";
-		} else if (Os.isFamily(Os.FAMILY_MAC)) {
-			return basePath + "node-v" + nodeJsVersion + "-darwin-x" + (Os.OS_ARCH.equals("x86") ? "86" : "64") + File.separator + "bin" + File.separator + "node";
-		} else if (Os.isFamily(Os.FAMILY_UNIX)) {
-			return basePath + "node-v" + nodeJsVersion + "-linux-x" + (Os.OS_ARCH.equals("x86") ? "86" : "64") + File.separator + "bin" + File.separator + "node";
-		} else {
-			getLog().error("Unsupported OS Family " + Os.OS_FAMILY);
-			throw new MojoExecutionException("Unsupported OS Family " + Os.OS_FAMILY);
-		}
+	public NodeInstallInformation run() throws MojoExecutionException {
+		return run(null);
 	}
 
-	public void execute() throws MojoExecutionException {
+	public NodeInstallInformation run(TaskFilter filter) throws MojoExecutionException {
 		if (tasks == null || tasks.isEmpty()) {
 			getLog().warn("No NodeJSTasks have been defined. Nothing to do");
-			return;
+			return null;
 		}
 
-		nodeJsExecutable = getNodeJsExecutable();
+		NodeInstallInformation information = getNodeInstallationInformation(nodeJsVersion, nodeJsDirectory);
 		try {
-			if (!FileUtils.fileExists(nodeJsExecutable)) {
-				getLog().info("Downloading Node JS from " + getNodeJsURL());
-				FileUtils.copyURLToFile(getNodeJsURL(), new File(getNodeJsFilePath()));
-				if (Os.isFamily(Os.FAMILY_MAC)) { // Unpack tar
-					String tarName = "node-v" + nodeJsVersion + "-darwin-x" + (Os.OS_ARCH.equals("x86") ? "86" : "64") + ".tar.gz";
+			if (nodeJsURL != null) {
+				information.url = new URL(nodeJsURL);
+			}
+		} catch (java.net.MalformedURLException ex) {
+			throw new MojoExecutionException("Malformed provided node URL", ex);
+		}
 
-					Commandline commandLine = getCommandLine(nodejsDirectory, "tar", "xf", tarName);
-					executeCommandLine(commandLine);
-				} else if (Os.isFamily(Os.FAMILY_UNIX)) { // Unpack tar
-					String tarName = "node-v" + nodeJsVersion + "-linux-x" + (Os.OS_ARCH.equals("x86") ? "86" : "64") + ".tar.gz";
-
-					Commandline commandLine = getCommandLine(nodejsDirectory, "tar", "xf", tarName);
+		try {
+			if (!information.executable.exists()) {
+				getLog().info("Downloading Node JS from " + information.url);
+				FileUtils.copyURLToFile(information.url, information.archive);
+				if (information.archive.getName().endsWith(".tar.gz")) {
+					Commandline commandLine = getCommandLine(nodeJsDirectory, "tar", "xf", information.archive.getName());
 					executeCommandLine(commandLine);
 				}
 			}
 
 			for (Task task : tasks) {
-				executeTask(task);
+				if (filter == null || filter.accept(task)) {
+					executeTask(task, information);
+				}
 			}
 		} catch (IOException ex) {
 			getLog().error("Failed to downloading nodeJs from " + nodeJsURL, ex);
@@ -183,6 +149,8 @@ public class NodeJsMojo extends AbstractMojo {
 			getLog().error("Command Line Exception", ex);
 			throw new MojoExecutionException("Command execution failed.", ex);
 		}
+
+		return information;
 	}
 
 	protected void executeClosureCompiler(ClosureCompilerTask task) {
@@ -216,7 +184,7 @@ public class NodeJsMojo extends AbstractMojo {
 		return new ClosureCompilerRunner(args.toArray(new String[args.size()]), task.outputFile);
 	}
 
-	private void addExternDirectory(File externDirectory, List<String> args) {
+	protected void addExternDirectory(File externDirectory, List<String> args) {
 		if (externDirectory != null) {
 			for (File extern : externDirectory.listFiles()) {
 				if (extern.isFile()) {
@@ -316,14 +284,16 @@ public class NodeJsMojo extends AbstractMojo {
 		return commandLine;
 	}
 
-	protected void executeTask(Task task) throws CommandLineException, MojoExecutionException {
+	protected void executeTask(Task task, NodeInstallInformation information) throws CommandLineException, MojoExecutionException {
 		if (task instanceof NodeJsTask) {
 			NodeJsTask nodeJsTask = (NodeJsTask) task;
-			Commandline commandLine = getCommandLine(nodeJsTask.workingDirectory, nodeJsExecutable, nodeJsTask.name, nodeJsTask.arguments);
+			Commandline commandLine = getCommandLine(nodeJsTask.workingDirectory, information.executable.getAbsolutePath(), nodeJsTask.name, nodeJsTask.arguments);
 			executeCommandLine(commandLine);
 		} else if (task instanceof ClosureCompilerTask) {
 			ClosureCompilerTask closureCompilerTask = (ClosureCompilerTask) task;
 			executeClosureCompiler(closureCompilerTask);
+		} else {
+			throw new MojoExecutionException("Unknown task type");
 		}
 	}
 }

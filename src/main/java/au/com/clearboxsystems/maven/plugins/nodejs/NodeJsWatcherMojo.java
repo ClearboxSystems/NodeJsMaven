@@ -34,7 +34,7 @@ import java.util.Map;
  * Date: 13/02/13
  */
 @Mojo( name = "watch", defaultPhase = LifecyclePhase.PROCESS_SOURCES)
-public class NodeJsWatcherMojo extends NodeJsMojo {
+public class NodeJsWatcherMojo extends NodeJsMojoBase {
 
 	private static final WatchEvent.Kind<?>[] watchEvents = {StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_MODIFY, StandardWatchEventKinds.ENTRY_DELETE};
 	private WatchService watchService;
@@ -42,41 +42,40 @@ public class NodeJsWatcherMojo extends NodeJsMojo {
 
 	private boolean changed = true;
 
+	private final NodeJsMojoBase.TaskFilter filter = new NodeJsMojoBase.TaskFilter() {
+			public boolean accept(Task t) {
+				return t.watch;
+			}
+		};
+
 	@Override
 	public void execute() throws MojoExecutionException {
-		super.execute();
-		try {
-			doExecute();
-		} catch (IOException ex) {
-			getLog().error("Failed to downloading nodeJs from " + nodeJsURL, ex);
-			throw new MojoExecutionException("Failed to downloading nodeJs from " + nodeJsURL, ex);
-		} catch (MojoExecutionException ex) {
-			getLog().error("Execution Exception", ex);
-			if (stopOnError) {
-				throw new MojoExecutionException("Execution Exception", ex);
-			}
-		} catch (CommandLineException ex) {
-			getLog().error("Command Line Exception", ex);
-			throw new MojoExecutionException("Command execution failed.", ex);
-		} catch (InterruptedException ex) {
-			getLog().error("Interrupted Exception", ex);
-		}
-	}
+		NodeJsMojoBase.NodeInstallInformation info = super.run(filter);
 
-	protected void doExecute() throws IOException, InterruptedException, CommandLineException, MojoExecutionException {
-		if (tasks == null || tasks.isEmpty()) {
+		if (info == null) {
 			return;
 		}
 
 		for (Task task : tasks) {
-			if (task.watch) {
-				addWatchForTask(task);
+			try {
+				if (task.watch) {
+					addWatchForTask(task);
+				}
+			} catch (IOException ex) {
+				throw new MojoExecutionException("Error adding watch for task " + task, ex);
 			}
 		}
 
-		getLog().info("Starting Watch vigil...");
-		while (true) {
-			watch();
+
+		getLog().info("Starting watch vigil");
+		try {
+			watch(info);
+		} catch (CommandLineException ex) {
+			throw new MojoExecutionException("Error during watch", ex);
+		} catch (InterruptedException ex) {
+			throw new MojoExecutionException("Error during watch", ex);
+		} catch (IOException ex) {
+			throw new MojoExecutionException("Error during watch", ex);
 		}
 	}
 
@@ -116,7 +115,7 @@ public class NodeJsWatcherMojo extends NodeJsMojo {
 		}
 	}
 
-	public void watch() throws IOException, InterruptedException, CommandLineException, MojoExecutionException {
+	public void watch(NodeJsMojoBase.NodeInstallInformation info) throws IOException, InterruptedException, CommandLineException, MojoExecutionException {
 		if (changed) {
 			getLog().info("Waiting for changes...");
 			changed = false;
@@ -159,7 +158,7 @@ public class NodeJsWatcherMojo extends NodeJsMojo {
 				}
 				if (task != null) {
 					getLog().info(String.format("%s MODIFIED rerunning Task", file));
-					executeTask(task);
+					executeTask(task, info);
 					changed = true;
 				}
 			}
