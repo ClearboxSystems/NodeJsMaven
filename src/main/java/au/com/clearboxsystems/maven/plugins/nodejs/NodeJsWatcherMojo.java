@@ -139,7 +139,10 @@ public class NodeJsWatcherMojo extends NodeJsMojoBase {
 			List<String> updatedFiles = new ArrayList<>();
 			for (WatchEvent<?> event : watchKey.pollEvents()) {
 				Path file = dir.resolve((Path) event.context());
+				String absolutePath = file.toFile().getAbsolutePath();
+				String filename = file.toFile().getName();
 				getLog().debug(String.format("watched %s - %s", event.kind().name(), file));
+
 
 				if (file.toString().endsWith("___jb_bak___") || file.toString().endsWith("___jb_old___")) { // Ignore tmp files from idea
 					continue;
@@ -149,11 +152,11 @@ public class NodeJsWatcherMojo extends NodeJsMojoBase {
 					continue;
 				}
 
-				if (file.toFile().getName().startsWith(".")) {
+				if (filename.startsWith(".")) {
 					continue;
 				}
 
-				if (file.toFile().getName().endsWith("~")) {
+				if (filename.endsWith("~")) {
 					continue;
 				}
 
@@ -177,6 +180,29 @@ public class NodeJsWatcherMojo extends NodeJsMojoBase {
 						task = watchTasks.get(file.getParent());
 					}
 					if (task != null) {
+						if (task instanceof ClosureCompilerTask) {
+							ClosureCompilerTask closureCompilerTask = (ClosureCompilerTask) task;
+							if (!filename.endsWith(".js")) {
+								// bail out here, because if it's not a .js file then the compiler task won't compile it
+								continue;
+							}
+							boolean validFile = false;
+							for (File source : closureCompilerTask.sources) {
+								String path = source.getAbsolutePath(); 
+								if (source.isDirectory()) {
+									if (absolutePath.startsWith(filename)) {
+										validFile = true;
+									}
+								} else {
+									if (absolutePath.equals(path)) {
+										validFile = true;
+									}
+								}
+							}
+							if (!validFile) {
+								continue;
+							}
+						}
 						getLog().info(String.format("%s MODIFIED rerunning Task", file));
 						executeTask(task, info);
 						changed = true;
