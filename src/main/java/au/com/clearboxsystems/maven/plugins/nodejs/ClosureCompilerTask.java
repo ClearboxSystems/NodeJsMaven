@@ -26,10 +26,7 @@ import java.util.List;
  */
 public class ClosureCompilerTask extends Task {
 	@Parameter(required = true)
-	public File sourceFile;
-
-	@Parameter
-	public File externDirectory;
+	public List<File> sources;
 
 	@Parameter
 	public List<File> externs;

@@ -154,10 +154,26 @@ public abstract class NodeJsMojoBase extends AbstractMojo {
 	}
 
 	protected void executeClosureCompiler(ClosureCompilerTask task) {
-		getLog().info("Closure Compiler compiling: " + task.sourceFile.getName() + " with " + task.compilationLevel);
+		getLog().info("Closure Compiler compiling: " + task.sources + " with " + task.compilationLevel);
 		ClosureCompilerRunner closureCompiler = buildClosureCompilerRunner(task);
 		if (closureCompiler.shouldRunCompiler()) {
 			closureCompiler.myRun();
+		}
+	}
+
+	public void addJavascriptFilesRecursively(String preArg, File file, List<String> args) {
+		if (file.isDirectory()) {
+			for (File f : file.listFiles()) {
+				addJavascriptFilesRecursively(preArg, f, args);
+			}
+		} else {
+			if (!file.getName().startsWith(".") && file.getName().endsWith(".js")
+				&& args.indexOf(file.getAbsolutePath()) == -1) {
+				if (preArg != null) {
+					args.add(preArg);
+				}
+				args.add(file.getAbsolutePath());
+			}
 		}
 	}
 
@@ -167,14 +183,13 @@ public abstract class NodeJsMojoBase extends AbstractMojo {
 		args.add("--compilation_level");
 		args.add(task.compilationLevel);
 
-		args.add("--js");
-		args.add(task.sourceFile.getAbsolutePath());
+		for (File source : task.sources) {
+			addJavascriptFilesRecursively("--js", source, args);
+		}
 
-		addExternDirectory(task.externDirectory, args);
 		if (task.externs != null) {
-			for (File externPath : task.externs) {
-				args.add("--externs");
-				args.add(externPath.getAbsolutePath());
+			for (File extern : task.externs) {
+				addJavascriptFilesRecursively("--externs", extern, args);
 			}
 		}
 
@@ -182,19 +197,6 @@ public abstract class NodeJsMojoBase extends AbstractMojo {
 		args.add(task.outputFile.getAbsolutePath());
 
 		return new ClosureCompilerRunner(args.toArray(new String[args.size()]), task.outputFile);
-	}
-
-	protected void addExternDirectory(File externDirectory, List<String> args) {
-		if (externDirectory != null) {
-			for (File extern : externDirectory.listFiles()) {
-				if (extern.isFile()) {
-					args.add("--externs");
-					args.add(extern.getAbsolutePath());
-				} else if (extern.isDirectory()) {
-					addExternDirectory(extern, args);
-				}
-			}
-		}
 	}
 
 	public class ClosureCompilerRunner extends CommandLineRunner {

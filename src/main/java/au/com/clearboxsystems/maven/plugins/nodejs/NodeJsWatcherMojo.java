@@ -22,6 +22,7 @@ import org.apache.tools.ant.taskdefs.Parallel;
 import org.codehaus.plexus.util.cli.CommandLineException;
 
 import java.io.IOException;
+import java.io.File;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
@@ -95,76 +96,96 @@ public class NodeJsWatcherMojo extends NodeJsMojoBase {
 				public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
 					dir.register(watchService, watchEvents);
 					watchTasks.put(dir, task);
-					getLog().info("Adding NodeJS watcher for: " + dir.toString());
+					//getLog().info("Adding NodeJS watcher for: " + dir.toString());
 					return FileVisitResult.CONTINUE;
 				}
 			});
-
 		} else if (task instanceof ClosureCompilerTask) {
-			ClosureCompilerTask closureCompilerTask = (ClosureCompilerTask) task;
-			Path sourceDir = closureCompilerTask.sourceFile.getParentFile().toPath();
+			final ClosureCompilerTask closureCompilerTask = (ClosureCompilerTask) task;
 
 			if (watchService == null) {
-				watchService = sourceDir.getFileSystem().newWatchService();
+				watchService = FileSystems.getDefault().newWatchService();
 			}
-			sourceDir.register(watchService, watchEvents);
-			watchTasks.put(closureCompilerTask.sourceFile.toPath(), task);
-			getLog().info("Adding Closure watcher for: " + closureCompilerTask.sourceFile.toPath());
+
+			for (File source : closureCompilerTask.sources) {
+				Path path = source.getParentFile().toPath();
+				path.register(watchService, watchEvents);
+				watchTasks.put(path, task);
+				Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+						@Override
+							public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+							dir.register(watchService, watchEvents);
+							watchTasks.put(dir, task);
+							//getLog().info("Adding Closure watcher for: " + closureCompilerTask.sources);
+							return FileVisitResult.CONTINUE;
+						}
+					});
+			}
 		} else {
 			watchService = null;
 		}
 	}
 
 	public void watch(NodeJsMojoBase.NodeInstallInformation info) throws IOException, InterruptedException, CommandLineException, MojoExecutionException {
-		if (changed) {
-			getLog().info("Waiting for changes...");
-			changed = false;
-		}
-
-		WatchKey watchKey = watchService.take();
-		Path dir = (Path) watchKey.watchable();
-
-		List<String> updatedFiles = new ArrayList<>();
-		for (WatchEvent<?> event : watchKey.pollEvents()) {
-			Path file = dir.resolve((Path) event.context());
-			getLog().debug(String.format("watched %s - %s", event.kind().name(), file));
-
-			if (file.toString().endsWith("___jb_bak___") || file.toString().endsWith("___jb_old___")) { // Ignore tmp files from idea
-				continue;
+		while (true) {
+			if (changed) {
+				getLog().info("Waiting for changes...");
+				changed = false;
 			}
 
-			if (updatedFiles.contains(file.toString())) {
-				continue;
-			}
+			WatchKey watchKey = watchService.take();
+			Path dir = (Path) watchKey.watchable();
 
-			if (Files.isDirectory(file)) {
-				if (event.kind().name().equals(StandardWatchEventKinds.ENTRY_CREATE.name())) {
-					// watch created folder.
-					Task task = watchTasks.get(file.getParent());
+			List<String> updatedFiles = new ArrayList<>();
+			for (WatchEvent<?> event : watchKey.pollEvents()) {
+				Path file = dir.resolve((Path) event.context());
+				getLog().debug(String.format("watched %s - %s", event.kind().name(), file));
+
+				if (file.toString().endsWith("___jb_bak___") || file.toString().endsWith("___jb_old___")) { // Ignore tmp files from idea
+					continue;
+				}
+
+				if (updatedFiles.contains(file.toString())) {
+					continue;
+				}
+
+				if (file.toFile().getName().startsWith(".")) {
+					continue;
+				}
+
+				if (file.toFile().getName().endsWith("~")) {
+					continue;
+				}
+
+				if (Files.isDirectory(file)) {
+					if (event.kind().name().equals(StandardWatchEventKinds.ENTRY_CREATE.name())) {
+						// watch created folder.
+						Task task = watchTasks.get(file.getParent());
+						if (task != null) {
+							file.register(watchService, watchEvents);
+							getLog().info(String.format("added watch for %s", file));
+							watchTasks.put(file, task);
+						}
+					}
+					continue;
+				}
+
+				if (event.kind().name().equals(StandardWatchEventKinds.ENTRY_MODIFY.name()) || event.kind().name().equals(StandardWatchEventKinds.ENTRY_CREATE.name())) {
+					updatedFiles.add(file.toString());
+					Task task = watchTasks.get(file);
+					if (task == null) {
+						task = watchTasks.get(file.getParent());
+					}
 					if (task != null) {
-						file.register(watchService, watchEvents);
-						getLog().info(String.format("added watch for %s", file));
-						watchTasks.put(file, task);
+						getLog().info(String.format("%s MODIFIED rerunning Task", file));
+						executeTask(task, info);
+						changed = true;
 					}
 				}
-				continue;
-			}
 
-			if (event.kind().name().equals(StandardWatchEventKinds.ENTRY_MODIFY.name()) || event.kind().name().equals(StandardWatchEventKinds.ENTRY_CREATE.name())) {
-				updatedFiles.add(file.toString());
-				Task task = watchTasks.get(file);
-				if (task == null) {
-					task = watchTasks.get(file.getParent());
-				}
-				if (task != null) {
-					getLog().info(String.format("%s MODIFIED rerunning Task", file));
-					executeTask(task, info);
-					changed = true;
-				}
 			}
-
+			watchKey.reset();
 		}
-		watchKey.reset();
 	}
 
 
