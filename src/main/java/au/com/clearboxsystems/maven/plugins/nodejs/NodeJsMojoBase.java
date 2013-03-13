@@ -161,40 +161,63 @@ public abstract class NodeJsMojoBase extends AbstractMojo {
 		}
 	}
 
-	public void addJavascriptFilesRecursively(String preArg, File file, List<String> args) {
+	public void findJavascriptFilesRecursively(File file, Collection<String> paths) {
 		if (file.isDirectory()) {
 			for (File f : file.listFiles()) {
-				addJavascriptFilesRecursively(preArg, f, args);
+				findJavascriptFilesRecursively(f, paths);
 			}
 		} else {
-			if (!file.getName().startsWith(".") && file.getName().endsWith(".js")
-				&& args.indexOf(file.getAbsolutePath()) == -1) {
-				if (preArg != null) {
-					args.add(preArg);
-				}
-				args.add(file.getAbsolutePath());
+			if (!file.getName().startsWith(".") && file.getName().endsWith(".js")) {
+				paths.add(file.getAbsolutePath());
 			}
 		}
 	}
 
 	public ClosureCompilerRunner buildClosureCompilerRunner(ClosureCompilerTask task) {
+		Set<String> paths;
 		List<String> args = new ArrayList<>();
 
-		args.add("--compilation_level");
-		args.add(task.compilationLevel);
-
+		paths = new HashSet<>();
 		for (File source : task.sources) {
-			addJavascriptFilesRecursively("--js", source, args);
+			findJavascriptFilesRecursively(source, paths);
 		}
-
-		if (task.externs != null) {
-			for (File extern : task.externs) {
-				addJavascriptFilesRecursively("--externs", extern, args);
-			}
+		for (String path : paths) {
+			args.add("--js");
+			args.add(path);
 		}
 
 		args.add("--js_output_file");
 		args.add(task.outputFile.getAbsolutePath());
+
+		if (task.externs != null) {
+			paths = new HashSet<>();
+			for (File extern : task.externs) {
+				findJavascriptFilesRecursively(extern, paths);
+			}
+			for (String path : paths) {
+				args.add("--externs");
+				args.add(path);
+			}
+		}
+
+		if (task.compilationLevel != null) {
+			args.add("--compilation_level");
+			args.add(task.compilationLevel);
+		}
+
+		if (task.debug) {
+			args.add("--debug");
+		}
+
+		if (task != null && !task.formatting.isEmpty()) {
+			args.add("--formatting");
+			args.add(task.formatting);
+		}
+
+		if (task.warningLevel != null) {
+			args.add("--warning_level");
+			args.add(task.warningLevel);
+		}
 
 		return new ClosureCompilerRunner(args.toArray(new String[args.size()]), task.outputFile);
 	}
@@ -203,6 +226,7 @@ public abstract class NodeJsMojoBase extends AbstractMojo {
 		private File outputFile;
 		public ClosureCompilerRunner(String[] args, File outputFile) {
 			super(args);
+			getLog().debug(Arrays.asList(args).toString());
 			this.outputFile = outputFile;
 		}
 

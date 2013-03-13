@@ -186,7 +186,7 @@ public class NodeJsWatcherMojo extends NodeJsMojoBase {
 								// bail out here, because if it's not a .js file then the compiler task won't compile it
 								continue;
 							}
-							boolean validFile = false;
+							/*boolean validFile = false;
 							for (File source : closureCompilerTask.sources) {
 								String path = source.getAbsolutePath(); 
 								if (source.isDirectory()) {
@@ -201,7 +201,7 @@ public class NodeJsWatcherMojo extends NodeJsMojoBase {
 							}
 							if (!validFile) {
 								continue;
-							}
+								}*/
 						}
 						getLog().info(String.format("%s MODIFIED rerunning Task", file));
 						executeTask(task, info);

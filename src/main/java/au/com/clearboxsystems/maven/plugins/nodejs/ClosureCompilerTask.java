@@ -40,4 +40,19 @@ public class ClosureCompilerTask extends Task {
 	@Parameter(defaultValue = "SIMPLE_OPTIMIZATIONS")
 	public String compilationLevel;
 
+	@Parameter()
+	public boolean debug;
+
+	// PRETTY_PRINT
+	// PRINT_INPUT_DELIMITER
+	// SINGLE_QUOTES
+	@Parameter(defaultValue = "")
+	public String formatting;
+
+	// QUIET
+	// DEFAULT
+	// VERBOSE
+	@Parameter(defaultValue = "DEFAULT")
+	public String warningLevel;
+
 }
