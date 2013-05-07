@@ -73,7 +73,7 @@ public abstract class NodeJsMojoBase extends AbstractMojo {
 		String baseURL = "http://nodejs.org/dist/v" + version + "/";
 		String basePath = directory.getAbsolutePath() + File.separator;
 		String arch;
-		if (Os.isArch("x86")) {
+		if (Os.isArch("x86") || Os.isArch("i386")) {
 			arch = "x86";
 		} else if (Os.isArch("x86_64") || Os.isArch("amd64")) {
 			arch = "x64";
